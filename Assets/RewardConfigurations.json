@@ -9,6 +9,7 @@
         {"x": -5.3, "y": 1, "z": 15.3}
       ]
     },
+    /*
     {
       "configName": "Config 2",
       "rewardPositions": [
@@ -18,7 +19,8 @@
         {"x": -5.3, "y": 1, "z": 25.6}
       ]
     }
+    */
   ],
-  "trialsPerConfig": 3,
+  "trialsPerConfig": 2,
   "gridStepSize": 10.3
 }
