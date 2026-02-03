@@ -43,6 +43,15 @@ public class rewardManager : MonoBehaviour
     private int nextRewardIdx = 0;
     private int repsCompleted = 0;
     private int lastShownRewardIdx = -1;
+
+    // near the other public helpers
+    public int GetCurrentRewardCount()
+    {
+        return currentRewardObjects != null ? currentRewardObjects.Length : 0;
+    }
+
+    private bool experimentFinished = false;
+
     
     void Awake() //V: Awake() takes precedence over any Start() in any of the scripts, so we make sure all rewards are hidden before starting 
     {
@@ -89,37 +98,48 @@ public class rewardManager : MonoBehaviour
 
     public void LoadConfiguration(int index)
     {
-        if (index >= 0 && index < configData.configurations.Count)
+        if (configData == null || index < 0 || index >= configData.configurations.Count)
         {
-            currentConfigIdx = index;
-            
-            // Destroy old rewards
-            if (currentRewardObjects != null)
-            {
-                foreach (GameObject reward in currentRewardObjects)
-                {
-                    if (reward != null)
-                        Destroy(reward);
-                }
-            }
-            
-            List<GridPosition> positions = configData.configurations[index].rewardPositions;
-            
-            // Create new rewards at specified positions
-            currentRewardObjects = new GameObject[4];
-            for (int i = 0; i < 4; i++)
-            {
-                Vector3 worldPos = positions[i].ToVector3();
-                currentRewardObjects[i] = Instantiate(rewardPrefab, worldPos, Quaternion.identity);
-                currentRewardObjects[i].name = $"Reward_{(char)('A' + i)}_{configData.configurations[index].configName}";
-                currentRewardObjects[i].GetComponent<Renderer>().enabled = false;
-                
-                Debug.Log($"Reward {(char)('A' + i)} at world position: {worldPos}");
-            }
-            
-            Debug.Log($"Loaded {configData.configurations[index].configName}");
+            Debug.LogError("Invalid configuration index");
+            return;
         }
+
+        currentConfigIdx = index;
+
+        // Destroy old rewards
+        if (currentRewardObjects != null)
+        {
+            foreach (GameObject reward in currentRewardObjects)
+                if (reward != null) Destroy(reward);
+        }
+
+        List<GridPosition> positions = configData.configurations[index].rewardPositions;
+        if (positions == null || positions.Count == 0)
+        {
+            Debug.LogError("No positions in configuration " + index);
+            return;
+        }
+
+        // create array sized to positions
+        currentRewardObjects = new GameObject[positions.Count];
+        for (int i = 0; i < positions.Count; i++)
+        {
+            Vector3 worldPos = positions[i].ToVector3();
+            currentRewardObjects[i] = Instantiate(rewardPrefab, worldPos, Quaternion.identity);
+            currentRewardObjects[i].name = $"Reward_{(char)('A' + i)}_{configData.configurations[index].configName}";
+            var rend = currentRewardObjects[i].GetComponent<Renderer>();
+            if (rend != null) rend.enabled = false;
+            Debug.Log($"Reward {(char)('A' + i)} at world position: {worldPos}");
+        }
+
+        // reset indices for new configuration
+        nextRewardIdx = 0;
+        lastShownRewardIdx = -1;
+        HideAllRewards();
+
+        Debug.Log($"Loaded {configData.configurations[index].configName} with {positions.Count} rewards");
     }
+
     
     public int GetTotalConfigurations()
     {
@@ -131,60 +151,94 @@ public class rewardManager : MonoBehaviour
         return configData.configurations[currentConfigIdx].configName;
     }
     
-    public bool RewardFound(Vector3 playerPosition) //V: public so can be accessed by player movement script
+
+    public bool RewardFound(Vector3 playerPosition)
     {
-        Debug.Log($"=== RewardFound called ===");
-        Debug.Log($"Player position: {playerPosition}");
-        Debug.Log($"nextRewardIdx: {nextRewardIdx}");
-        if (nextRewardIdx > 3) //V: stop checking if we have already found the last reward
+        if (experimentFinished)
         {
             return false;
         }
-        
+
+        Debug.Log($"=== RewardFound called === nextRewardIdx={nextRewardIdx}");
+        if (currentRewardObjects == null || nextRewardIdx >= currentRewardObjects.Length)
+        {
+            return false;
+        }
+
         GameObject currReward = currentRewardObjects[nextRewardIdx];
+        if (currReward == null) return false;
+
         float distance = Vector3.Distance(playerPosition, currReward.transform.position);
-        
-        if (distance < 0.01f)
+
+        // increase tolerance a little — 0.01 is extremely small
+        const float uncoverThreshold = 0.05f;
+
+        if (distance < uncoverThreshold)
         {
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
             {
                 Debug.Log("spacebar was pressed");
-                Debug.Log($"Reward {nextRewardIdx + 1}/4 found!");
-                ShowReward(nextRewardIdx);  
-                lastShownRewardIdx = nextRewardIdx;  
-                
+                Debug.Log($"Reward {nextRewardIdx + 1}/{currentRewardObjects.Length} found!");
+                ShowReward(nextRewardIdx);
+                lastShownRewardIdx = nextRewardIdx;
                 nextRewardIdx++;
-                
-                if (nextRewardIdx > 3) //V: check if we have just found the last reward
+
+                if (nextRewardIdx >= currentRewardObjects.Length)
                 {
                     repsCompleted++;
-                    Debug.Log($"Last reward found! Trial {repsCompleted}/3 complete");
+                    Debug.Log($"Last reward found! Trial {repsCompleted}/{configData.trialsPerConfig} complete");
                     CompleteTrial();
                 }
-                
-                return true;  
+                return true;
             }
             return false;
         }
         else
         {
-            if (lastShownRewardIdx >= 0)
+            if (lastShownRewardIdx >= 0 && lastShownRewardIdx < currentRewardObjects.Length)
             {
                 GameObject lastReward = currentRewardObjects[lastShownRewardIdx];
-                float distanceToLast = Vector3.Distance(playerPosition, lastReward.transform.position);
-
-                // hide reward only once player has actually left it
-                if (distanceToLast > 0.05f) // adjust threshold if needed
+                if (lastReward != null)
                 {
-                    HideReward(lastShownRewardIdx);
-                    lastShownRewardIdx = -1;
+                    float distanceToLast = Vector3.Distance(playerPosition, lastReward.transform.position);
+                    if (distanceToLast > uncoverThreshold * 1.5f)
+                    {
+                        HideReward(lastShownRewardIdx);
+                        lastShownRewardIdx = -1;
+                    }
                 }
             }
         }
         return false;
     }
-        
+    
+
+    private void FinishAllConfigurations()
+    {
+        Debug.Log("FinishAllConfigurations: all configs completed.");
+        experimentFinished = true;
+
+        // disable player movement
+        var playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+        {
+            var mover = playerObj.GetComponent<moveplayer>();
+            if (mover != null) mover.enabled = false;
+            var rend = playerObj.GetComponent<Renderer>();
+            if (rend != null) rend.enabled = false; // optional: hide player
+        }
+
+        // stop any further reward checks quickly
+        nextRewardIdx = currentRewardObjects != null ? currentRewardObjects.Length : 0;
+
+        // Editor convenience: stop Play mode when running inside the Editor
+        #if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+        #endif
+    }
+
+ 
      
     void CompleteTrial() //V: check if we have completed all repetitions of the current trial and switch to next configuration if appropriate
     {
@@ -206,14 +260,31 @@ public class rewardManager : MonoBehaviour
         }
         else
         {
-            Debug.Log($"Moving on to repetition {repsCompleted + 1}/3");
-            Invoke("ResetTrial", 2f);
+            Debug.Log("All configurations completed!");
+            FinishAllConfigurations();
         }
     }
 
     void StartNextConfiguration()
     {
-        FindFirstObjectByType<CameraManager>().StartNewConfiguration(currentConfigIdx);
+        // instantiate rewards for the new currentConfigIdx and reset trial state
+        LoadConfiguration(currentConfigIdx);
+
+        // ensure CameraManager shows the top-down/sequence for the new config
+        var cam = FindObjectOfType<CameraManager>();
+        if (cam != null)
+        {
+            Debug.Log($"Telling CameraManager to start config {currentConfigIdx}");
+            cam.StartNewConfiguration(currentConfigIdx);
+        }
+        else
+        {
+            Debug.LogWarning("CameraManager not found; sequence won't be shown.");
+        }
+
+        repsCompleted = 0;
+        nextRewardIdx = 0;
+        lastShownRewardIdx = -1;
     }
     
     void ResetTrial()
@@ -221,8 +292,7 @@ public class rewardManager : MonoBehaviour
         HideAllRewards();
         nextRewardIdx = 0;
         lastShownRewardIdx = -1;
-        
-        Debug.Log($"Starting trial {repsCompleted + 1}/3 of Config {currentConfigIdx}");
+        Debug.Log($"Starting trial {repsCompleted + 1}/{configData.trialsPerConfig} of Config {currentConfigIdx}");
     }
 
     public void ShowReward(int index)

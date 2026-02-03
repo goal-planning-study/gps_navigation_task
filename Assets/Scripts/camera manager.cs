@@ -69,36 +69,32 @@ public class CameraManager : MonoBehaviour
     
     IEnumerator ShowRewardSequence()
     {
-        //V: Show sequence multiple times
+        int rewardCount = rewardManager.GetCurrentRewardCount();
+        if (rewardCount == 0)
+        {
+            Debug.LogError("ShowRewardSequence: no rewards to show (rewardCount == 0). Aborting sequence.");
+            StartGamePhase();
+            yield break;
+        }
+
         for (int repetition = 0; repetition < memorizationRepetitions; repetition++)
         {
             Debug.Log($"Showing sequence {repetition + 1}/{memorizationRepetitions}");
-            
-            //V: Show each of the 4 rewards in order
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < rewardCount; i++)
             {
+                Debug.Log($"Showing reward index {i}");
                 rewardManager.ShowReward(i);
-                Debug.Log($"Reward {i + 1}/4");
-                
                 yield return new WaitForSeconds(rewardDisplayTime);
-                
                 rewardManager.HideReward(i);
-                
                 yield return new WaitForSeconds(pauseBetweenRewards);
             }
-            
-            //V: Pause between repetitions (but not after the last one)
+
             if (repetition < memorizationRepetitions - 1)
-            {
                 yield return new WaitForSeconds(pauseBetweenSeq);
-            }
         }
-        
+
         Debug.Log("Memorization complete! Starting game...");
-        
         yield return new WaitForSeconds(1f);
-        
-        //V: Start gameplay phase
         StartGamePhase();
     }
     
