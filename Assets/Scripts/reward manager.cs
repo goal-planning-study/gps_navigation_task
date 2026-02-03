@@ -51,6 +51,8 @@ public class rewardManager : MonoBehaviour
     }
 
     private bool experimentFinished = false;
+    private bool trialCompleted = false;
+
 
     
     void Awake() //V: Awake() takes precedence over any Start() in any of the scripts, so we make sure all rewards are hidden before starting 
@@ -137,6 +139,8 @@ public class rewardManager : MonoBehaviour
         lastShownRewardIdx = -1;
         HideAllRewards();
 
+        trialCompleted = false;
+
         Debug.Log($"Loaded {configData.configurations[index].configName} with {positions.Count} rewards");
         Debug.Log($"Starting trial {repsCompleted + 1}/{configData.trialsPerConfig} of Config {currentConfigIdx}");
     }
@@ -155,7 +159,7 @@ public class rewardManager : MonoBehaviour
 
     public bool RewardFound(Vector3 playerPosition)
     {
-        if (experimentFinished)
+        if (experimentFinished || trialCompleted)
         {
             return false;
         }
@@ -189,6 +193,10 @@ public class rewardManager : MonoBehaviour
                 {
                     repsCompleted++;
                     Debug.Log($"Last reward found! Trial {repsCompleted}/{configData.trialsPerConfig} complete");
+
+                    // prevent further checks until trial reset/next config
+                    trialCompleted = true;
+
                     CompleteTrial();
                 }
                 return true;
@@ -240,24 +248,26 @@ public class rewardManager : MonoBehaviour
     }
 
  
-     
-    void CompleteTrial() //V: check if we have completed all repetitions of the current trial and switch to next configuration if appropriate
+        
+    void CompleteTrial()
     {
-        if (repsCompleted >= configData.trialsPerConfig)  
-        {
-            if (currentConfigIdx < configData.configurations.Count - 1)
-            {
-                Debug.Log($"{configData.configurations[currentConfigIdx].configName} complete!");
-                currentConfigIdx++;
-                repsCompleted = 0;
+        Debug.Log($"CompleteTrial() called: repsCompleted={repsCompleted}, trialsPerConfig={configData.trialsPerConfig}, currentConfigIdx={currentConfigIdx}/{configData.configurations.Count-1}");
 
-                Invoke("StartNextConfiguration", 2f); //V: have top down view of the next configuration start a few seconds after trial is completed
-  
-            }
-            else
-            {
-                Debug.Log("All configurations completed!");
-            }
+        // If we still need more repetitions for this configuration, reset for the next repetition
+        if (repsCompleted < configData.trialsPerConfig)
+        {
+            Debug.Log($"Moving on to repetition {repsCompleted + 1}/{configData.trialsPerConfig}");
+            Invoke(nameof(ResetTrial), 2f);
+            return;
+        }
+
+        // We finished the required repetitions for the current configuration
+        if (currentConfigIdx < configData.configurations.Count - 1)
+        {
+            Debug.Log($"{configData.configurations[currentConfigIdx].configName} complete! Advancing to next config.");
+            currentConfigIdx++;
+            repsCompleted = 0;
+            Invoke(nameof(StartNextConfiguration), 2f);
         }
         else
         {
@@ -293,6 +303,7 @@ public class rewardManager : MonoBehaviour
         HideAllRewards();
         nextRewardIdx = 0;
         lastShownRewardIdx = -1;
+        trialCompleted = false;
         Debug.Log($"Starting trial {repsCompleted + 1}/{configData.trialsPerConfig} of Config {currentConfigIdx}");
     }
 
