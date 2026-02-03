@@ -138,6 +138,7 @@ public class rewardManager : MonoBehaviour
         HideAllRewards();
 
         Debug.Log($"Loaded {configData.configurations[index].configName} with {positions.Count} rewards");
+        Debug.Log($"Starting trial {repsCompleted + 1}/{configData.trialsPerConfig} of Config {currentConfigIdx}");
     }
 
     
