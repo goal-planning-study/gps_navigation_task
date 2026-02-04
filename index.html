@@ -120,6 +120,34 @@
                 document.querySelector("#unity-fullscreen-button").onclick = () => {
                   unityInstance.SetFullscreen(1);
                 };
+                // Make unityInstance accessible globally for message forwarding
+                window.__unity_instance = unityInstance;
+
+                // Listen for parent messages (e.g., participant info or other commands)
+                window.addEventListener('message', function(event) {
+                  // SECURITY: check origin in production
+                  // if (event.origin !== 'https://run.pavlovia.org') return;
+
+                  try {
+                    const msg = event.data;
+                    if (!msg) return;
+
+                    if (msg.type === 'SET_PARTICIPANT' && msg.payload && window.__unity_instance) {
+                      // forward to the DataLogger GameObject in Unity
+                      try {
+                        window.__unity_instance.SendMessage('DataLogger', 'SetParticipantInfo', msg.payload);
+                        console.log('[iframe] forwarded SET_PARTICIPANT to Unity:', msg.payload);
+                      } catch(e) {
+                        console.warn('SendMessage failed (maybe Unity not ready yet)', e);
+                        // store in sessionStorage for Unity to read later if needed
+                        sessionStorage.setItem('pending_participant', msg.payload);
+                      }
+                    }
+                    // you can handle other message types here
+                  } catch(e) {
+                    console.warn('parent message handler error', e);
+                  }
+                });
 
               }).catch((message) => {
                 alert(message);
