@@ -126,6 +126,39 @@
               });
             };
 
+            
+      (function(){
+        const targetOrigin = '*'; // replace if needed
+        const originalLog = console.log.bind(console);
+        let messageSent = false;
+
+        console.log = function(...args) {
+          try {
+            // call original
+            originalLog(...args);
+
+            if (messageSent) return;
+
+            // join to a single string so we can match substrings
+            const text = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+
+            // adjust this test to the exact final log you emit in Unity
+            if (text.includes('All configurations completed!') ||
+                text.includes('FinishAllConfigurations: all configs completed.') ||
+                text.includes('ABCD_DONE')) {
+              messageSent = true;
+              try { window.parent.postMessage('ABCD_DONE', targetOrigin); }
+              catch (e) {
+                try { window.parent.postMessage('ABCD_DONE', '*'); } catch (e2) {}
+              }
+              originalLog('[postMessage bridge] ABCD_DONE sent to parent.');
+            }
+          } catch (e) {
+            try { originalLog('console wrapper error', e); } catch (_) {}
+          }
+        };
+      })();
+
       document.body.appendChild(script);
 
     </script>
