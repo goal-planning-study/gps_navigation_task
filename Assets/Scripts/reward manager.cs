@@ -164,7 +164,6 @@ public class rewardManager : MonoBehaviour
             return false;
         }
 
-        Debug.Log($"=== RewardFound called === nextRewardIdx={nextRewardIdx}");
         if (currentRewardObjects == null || nextRewardIdx >= currentRewardObjects.Length)
         {
             return false;
