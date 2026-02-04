@@ -1,7 +1,8 @@
 {
   "configurations": [
     {
-      "configName": "Config 1",
+      "configName": "Config_1_Forward",
+      "trialType": "forw",
       "rewardPositions": [
         {"x": 15.3, "y": 1, "z": 5},
         {"x": -5.3, "y": 1, "z": 25.6},
@@ -10,7 +11,8 @@
       ]
     },
     {
-      "configName": "Config 2",
+      "configName": "Config_2_Forward",
+      "trialType": "forw",
       "rewardPositions": [
         {"x": 5, "y": 1, "z": 15.3},
         {"x": 15.3, "y": 1, "z": 25.6},

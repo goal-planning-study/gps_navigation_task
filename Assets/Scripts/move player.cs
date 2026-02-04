@@ -29,7 +29,7 @@ public class moveplayer : MonoBehaviour
         else if (!isMoving)
         {
             CheckInput();
-            rewardManager.RewardFound(transform.position);
+            rewardManager.RewardFound(transform.position, "");
         }
         else if (isMoving)
         {
@@ -37,15 +37,16 @@ public class moveplayer : MonoBehaviour
         }
     }
     
-    void CheckInput() //V: check keyboard input and set the rotation and movement targets accordingly
+    void CheckInput()
     {
-        // New Input System syntax
         Keyboard keyboard = Keyboard.current;
-        
-        if (keyboard == null) return;  // Safety check
+        if (keyboard == null) return;
 
-        if (keyboard.upArrowKey.wasPressedThisFrame) //V: up key is the only one allowing to move, the other ones are just controlling rotations
+        string keyPressed = "";
+        
+        if (keyboard.upArrowKey.wasPressedThisFrame)
         {
+            keyPressed = "ArrowUp";
             Vector3 potentialTarget = transform.position + (transform.forward * gridStepSize);
             if (WithinBounds(potentialTarget)){
                 targetPosition = potentialTarget;
@@ -55,21 +56,29 @@ public class moveplayer : MonoBehaviour
         }
         else if (keyboard.downArrowKey.wasPressedThisFrame)
         {
+            keyPressed = "ArrowDown";
             SetTarget(180f);
             cameraManager.DisableMiniMap();
         }
         else if (keyboard.leftArrowKey.wasPressedThisFrame)
         {
-            SetTarget( -90f);
+            keyPressed = "ArrowLeft";
+            SetTarget(-90f);
             cameraManager.DisableMiniMap();
         }
         else if (keyboard.rightArrowKey.wasPressedThisFrame)
         {
+            keyPressed = "ArrowRight";
             SetTarget(90f);
             cameraManager.DisableMiniMap();
         }
-    }
 
+        // Check for reward with key info
+        if (!string.IsNullOrEmpty(keyPressed))
+        {
+            rewardManager.RewardFound(transform.position, keyPressed);
+        }
+    }
     void SetTarget(float relativeYRotation) //V: calculate rotation target relative to current position and set isRotating to true
     {
         float currentYRotation = transform.rotation.eulerAngles.y;
@@ -121,7 +130,7 @@ public class moveplayer : MonoBehaviour
             transform.position = targetPosition;
             isMoving = false;
 
-            rewardManager.RewardFound(transform.position);
+            rewardManager.RewardFound(transform.position, "");
         }
     }
 }

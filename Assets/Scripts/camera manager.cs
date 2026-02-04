@@ -105,23 +105,22 @@ public class CameraManager : MonoBehaviour
         player.GetComponent<Renderer>().enabled = true;
         player.GetComponent<moveplayer>().enabled = true;
         
+        // Notify rewardManager that trial is starting
+        var rewardMgr = FindObjectOfType<rewardManager>();
+        if (rewardMgr != null)
+        {
+            rewardMgr.StartNewTrial(player.transform.position);
+        }
+        
         Debug.Log("Find the rewards in order: A → B → C → D");
     }
 
     public void DisableMiniMap()
     {
-        Debug.Log("DisableMiniMap() called");
-        Debug.Log($"miniMapCamera is null: {miniMapCamera == null}");
-        Debug.Log($"miniMapCamera.enabled: {miniMapCamera != null && miniMapCamera.enabled}");
         
         if (miniMapCamera != null && miniMapCamera.enabled)
         {
             miniMapCamera.enabled = false;
-            Debug.Log("Minimap disabled");
-        }
-        else
-        {
-            Debug.Log("Minimap was already disabled or is null");
         }
     }
 }

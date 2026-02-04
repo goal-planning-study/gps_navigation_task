@@ -23,7 +23,7 @@ public class ContinuousMovement : MonoBehaviour
         //V: if we have stopped moving, then call function to check if we have found a reward
         if (Vector3.Distance(transform.position, lastPosition) < 0.001f && hasMoved) // FIXED: position
         {
-            rewardManager.RewardFound(transform.position);
+            rewardManager.RewardFound(transform.position, "");
             hasMoved = false;
         }
         

@@ -49,6 +49,8 @@
     <Analyzer Include="/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/Resources/BuildPipeline/Unity.SourceGenerators/Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets/Scripts/ParticipantInfoReader.cs" />
+    <Compile Include="Assets/Scripts/DataLogger.cs" />
     <Compile Include="Assets/Scripts/reward manager.cs" />
     <Compile Include="Assets/Scripts/ContinuousMovement.cs" />
     <Compile Include="Assets/Scripts/move player.cs" />
