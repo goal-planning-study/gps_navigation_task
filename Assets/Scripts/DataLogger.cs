@@ -238,6 +238,8 @@ public class DataLogger : MonoBehaviour
     private void SendToJavaScript(object data)
     {
         string json = JsonUtility.ToJson(data);
+
+        Debug.Log("[WEBGL_DATA] " + json);
         
         #if UNITY_WEBGL && !UNITY_EDITOR
         try
