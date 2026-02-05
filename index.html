@@ -23,6 +23,35 @@
         <div id="unity-build-title">ABCD_unity</div>
       </div>
     </div>
+    
+    <script>
+    /* Ensure a safe SendDataToJS primitive exists early (shim). This forwards to parent. */
+    (function(){
+      if (typeof window.SendDataToJS !== 'undefined') {
+        console.log('[Shim] SendDataToJS already present');
+        return;
+      }
+      window.SendDataToJS = function(payload) {
+        try {
+          var s = typeof payload === 'string' ? payload : JSON.stringify(payload);
+          // log so we can see it in the iframe console (optional)
+          console.log('[WEBGL_DATA] ' + s);
+          // send structured message to parent
+          try {
+            var obj = JSON.parse(s);
+            window.parent.postMessage({ type: 'UNITY_DATA', data: obj }, '*');
+          } catch (e) {
+            // not JSON — send raw
+            window.parent.postMessage({ type: 'UNITY_DATA', data: s }, '*');
+          }
+        } catch (e) {
+          console.error('[Shim] SendDataToJS error', e);
+        }
+      };
+      console.log('[Shim] SendDataToJS installed');
+    })();
+    </script>
+
     <script>
       var canvas = document.querySelector("#unity-canvas");
       var unityInstance = null; // Store Unity instance globally
