@@ -110,10 +110,26 @@ public class DataLogger : MonoBehaviour
 
     void Start()
     {
-        // quick smoke test — will run in WebGL build
-        var test = new { event_type = "smoke_test_startup", note = "from DataLogger.Start()" };
-        SendToJavaScript(test);   // this should produce the [WEBGL_DATA] log in the iframe and parent
-        Debug.Log("[DATALOGGER TEST] Sent startup smoke_test");
+        // typed smoke test — this will serialize properly with JsonUtility
+        var test = new RewardData {
+            participant = participantId ?? "UNKNOWN",
+            study_id = studyId ?? "",
+            session_id = sessionId ?? "",
+            date = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            round = 0,
+            rep = 0,
+            rew_loc_x = 0f,
+            rew_loc_y = 0f,
+            rew_loc_z = 0f,
+            t_reward_start = GetUnixTimestamp(),
+            t_reward_start_global = GetUnixTimestamp(),
+            reward_letter = "X",
+            reward_index = -1,
+            state = "test",
+            moves_to_find = 0
+        };
+        SendToJavaScript(test);   // should yield a full JSON object in the iframe
+        Debug.Log("[DATALOGGER TEST] Sent typed startup smoke_test");
     }
 
     

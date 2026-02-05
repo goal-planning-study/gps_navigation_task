@@ -1704,7 +1704,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::rewardManager
   configurationFile: {fileID: 4900000, guid: bcedf1d0ea1254e1aab37edcd07f0af9, type: 3}
   rewardPrefab: {fileID: 980208851611756190, guid: fe22411ef595e419db892571e474b563, type: 3}
-  dataLogger: {fileID: 0}
+  dataLogger: {fileID: 1986021649}
 --- !u!4 &1972259392
 Transform:
   m_ObjectHideFlags: 0
@@ -1750,7 +1750,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 392ed3fe9ba0e440dac43b04fdcdf793, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  dataLogger: {fileID: 0}
+  dataLogger: {fileID: 1986021649}
 --- !u!114 &1986021649
 MonoBehaviour:
   m_ObjectHideFlags: 0

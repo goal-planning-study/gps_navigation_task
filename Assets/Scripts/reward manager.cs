@@ -156,13 +156,21 @@ public class rewardManager : MonoBehaviour
         playerStartPosition = playerPosition;
         keyPressIndex = 0;
         movementIndex = 0;
-        
+
+        if (dataLogger == null)
+        {
+            dataLogger = FindObjectOfType<DataLogger>();
+            if (dataLogger == null)
+                Debug.LogWarning("RewardManager: DataLogger not found in scene!");
+            else
+                Debug.Log("RewardManager: bound DataLogger via FindObjectOfType");
+        }
+
         // Log trial start
         if (dataLogger != null)
         {
             string sequence = GetCurrentSequence();
             string trialType = GetCurrentTrialType();
-            Debug.Log("[CALLER] about to call DataLogger...");
             dataLogger.LogTrialStart(currentConfigIdx, repsCompleted, trialType, sequence, playerStartPosition);
         }
     }
