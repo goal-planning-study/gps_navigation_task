@@ -74,6 +74,26 @@
 
       document.querySelector("#unity-loading-bar").style.display = "block";
 
+      /* --- Unity → Page bridge: ensure SendDataToJS exists --- */
+      window.SendDataToJS = function(payload) {
+        try {
+          // If Unity passed an object already, keep it, else try parse
+          var obj = (typeof payload === 'object') ? payload : JSON.parse(payload);
+          // Log using the pattern your console wrapper expects (optional but useful)
+          try { console.log('[WEBGL_DATA]' + JSON.stringify(obj)); } catch(e){}
+          // Also post to parent directly (so parent will receive even if console parsing fails)
+          try {
+            window.parent.postMessage({ type: 'UNITY_DATA', data: obj }, '*');
+            console.log('[Unity → Parent] Sent data event:', obj.event_type || '(no event_type)');
+          } catch(e) {
+            console.error('SendDataToJS: failed to postMessage', e);
+          }
+        } catch (e) {
+          console.error('SendDataToJS: invalid payload', payload, e);
+        }
+      };
+
+
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
