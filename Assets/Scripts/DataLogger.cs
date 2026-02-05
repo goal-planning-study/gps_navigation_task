@@ -241,6 +241,7 @@ public class DataLogger : MonoBehaviour
 
         Debug.Log("[WEBGL_DATA] " + json);
         
+        Debug.Log("[WEBGL_CALL] about to call SendDataToJS: " + json);
         #if UNITY_WEBGL && !UNITY_EDITOR
         try
         {

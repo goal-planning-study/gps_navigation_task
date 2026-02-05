@@ -81,6 +81,35 @@
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
         }).then((instance) => {
           unityInstance = instance; // Store instance
+
+            // expose the Emscripten Module globally for debugging and for shims
+            try {
+              if (!window.Module && instance && instance.Module) {
+                window.Module = instance.Module;
+                console.log('[Unity iframe] Exposed Module via unityInstance.Module');
+              }
+            } catch (e) { console.warn('Could not expose Module', e); }
+
+            // bind a global SendDataToJS wrapper if runtime export exists
+            try {
+              if (window.Module && typeof window.Module._SendDataToJS === 'function' && typeof window.SendDataToJS === 'undefined') {
+                window.SendDataToJS = function(jsonStr) {
+                  try {
+                    var len = window.Module.lengthBytesUTF8(jsonStr) + 1;
+                    var ptr = window.Module._malloc(len);
+                    window.Module.stringToUTF8(jsonStr, ptr, len);
+                    window.Module._SendDataToJS(ptr);
+                    window.Module._free(ptr);
+                  } catch (e){
+                    console.error('SendDataToJS wrapper call failed', e);
+                  }
+                };
+                console.log('[Unity iframe] Bound window.SendDataToJS → Module._SendDataToJS');
+              } else {
+                console.log('[Unity iframe] Module._SendDataToJS not present or already bound.');
+              }
+            } catch(e) { console.warn('SendDataToJS bind error', e); }
+
           document.querySelector("#unity-loading-bar").style.display = "none";
           document.querySelector("#unity-fullscreen-button").onclick = () => {
             instance.SetFullscreen(1);
