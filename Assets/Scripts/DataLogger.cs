@@ -107,6 +107,15 @@ public class DataLogger : MonoBehaviour
     // Trial tracking
     private double trialStartTime;
     private double experimentStartTime;
+
+    void Start()
+    {
+        // quick smoke test — will run in WebGL build
+        var test = new { event_type = "smoke_test_startup", note = "from DataLogger.Start()" };
+        SendToJavaScript(test);   // this should produce the [WEBGL_DATA] log in the iframe and parent
+        Debug.Log("[DATALOGGER TEST] Sent startup smoke_test");
+    }
+
     
     void Awake()
     {

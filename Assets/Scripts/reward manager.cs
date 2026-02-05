@@ -162,6 +162,7 @@ public class rewardManager : MonoBehaviour
         {
             string sequence = GetCurrentSequence();
             string trialType = GetCurrentTrialType();
+            Debug.Log("[CALLER] about to call DataLogger...");
             dataLogger.LogTrialStart(currentConfigIdx, repsCompleted, trialType, sequence, playerStartPosition);
         }
     }
@@ -202,6 +203,7 @@ public class rewardManager : MonoBehaviour
         // Log key press
         if (dataLogger != null && !string.IsNullOrEmpty(keyPressed))
         {
+            Debug.Log("[CALLER] about to call DataLogger...");
             dataLogger.LogKeyPress(currentConfigIdx, repsCompleted, keyPressed, keyPressIndex);
             keyPressIndex++;
         }
@@ -231,6 +233,7 @@ public class rewardManager : MonoBehaviour
                 if (dataLogger != null)
                 {
                     string state = ((char)('A' + nextRewardIdx)).ToString();
+                    Debug.Log("[CALLER] about to call DataLogger...");
                     dataLogger.LogMovement(
                         currentConfigIdx, 
                         repsCompleted,
@@ -279,6 +282,7 @@ public class rewardManager : MonoBehaviour
                 Vector3.Distance(previousPosition, playerPosition) > 0.01f)
             {
                 string state = ((char)('A' + nextRewardIdx)).ToString();
+                Debug.Log("[CALLER] about to call DataLogger...");
                 dataLogger.LogMovement(
                     currentConfigIdx,
                     repsCompleted,
