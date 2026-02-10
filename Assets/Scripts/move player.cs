@@ -52,25 +52,21 @@ public class moveplayer : MonoBehaviour
                 targetPosition = potentialTarget;
                 isMoving = true;
             }
-            cameraManager.DisableMiniMap();
         }
         else if (keyboard.downArrowKey.wasPressedThisFrame)
         {
             keyPressed = "ArrowDown";
             SetTarget(180f);
-            cameraManager.DisableMiniMap();
         }
         else if (keyboard.leftArrowKey.wasPressedThisFrame)
         {
             keyPressed = "ArrowLeft";
             SetTarget(-90f);
-            cameraManager.DisableMiniMap();
         }
         else if (keyboard.rightArrowKey.wasPressedThisFrame)
         {
             keyPressed = "ArrowRight";
             SetTarget(90f);
-            cameraManager.DisableMiniMap();
         }
 
         // Check for reward with key info

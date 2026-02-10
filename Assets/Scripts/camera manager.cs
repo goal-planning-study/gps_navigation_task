@@ -1,78 +1,73 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using System.Collections;
 
 public class CameraManager : MonoBehaviour
 {
-    //V: create all necessary cameras
-    public Camera firstPersonCamera;
-    public Camera miniMapCamera;
-    
-    //V: create reward manager object for showing rewards
+    public Camera mainCamera;
     public rewardManager rewardManager;
-    
-    //V: create player object
     public GameObject player;
     
-    //V: specify timing variables
+    [Header("Camera Positions")]
+    public Vector3 allocentricPosition = new Vector3(5f, 30f, 15f);
+    public Vector3 allocentricRotation = new Vector3(90f, 0f, 0f);
+    public Vector3 egocentricOffset = new Vector3(0f, 3f, -4f);
+    public float egocentricPitch = 18f;
+    
+    [Header("Timing")]
     public float rewardDisplayTime = 1.5f;
     public float pauseBetweenRewards = 0.5f;
     public float pauseBetweenSeq = 1f;
+    public float transitionDuration = 2.5f;
     
     [Header("Memorization Settings")]
-    public int memorizationRepetitions = 2;  //V: how many times to show the sequence
+    public int memorizationRepetitions = 2;
+    
+    private Vector3 targetEgocentricPosition;
+    private Quaternion targetEgocentricRotation;
     
     void Start()
     {
-        //V: Start with first configuration (index 0)
         StartNewConfiguration(0);
     }
     
-    //V: Called when starting a new configuration (at start and after completing trials)
     public void StartNewConfiguration(int configIndex)
     {
-        //V: Load the new configuration in reward manager
         rewardManager.LoadConfiguration(configIndex);
         
-        //V: Hide player and disable movement initially
         player.GetComponent<Renderer>().enabled = false;
         player.GetComponent<moveplayer>().enabled = false;
         
-        //V: Setup camera for memorization phase
-        SetupMemorizationCamera();
+        SetupAllocentricView();
         
         Debug.Log($"Memorizing {rewardManager.GetCurrentConfigName()}: Watch the reward sequence!");
         
-        //V: Start the coroutine to show rewards
         StartCoroutine(ShowRewardSequence());
     }
     
-    void SetupMemorizationCamera()
+    void SetupAllocentricView()
     {
-        firstPersonCamera.enabled = false;
-        miniMapCamera.enabled = true;
-        
-        //V: Put camera as full screen to show rewards
-        miniMapCamera.rect = new Rect(0, 0, 1, 1);
-        miniMapCamera.depth = 0;
+        mainCamera.transform.position = allocentricPosition;
+        mainCamera.transform.eulerAngles = allocentricRotation;
+        mainCamera.fieldOfView = 60f;
     }
     
-    void SetupGameplayCameras()
+    void CalculateEgocentricTarget()
     {
-        firstPersonCamera.enabled = true;
-        miniMapCamera.enabled = true;
-        
-        //V: Mini-map in top-right corner
-        miniMapCamera.rect = new Rect(0.75f, 0.75f, 0.25f, 0.25f);
-        miniMapCamera.depth = 1; 
+        // Position behind & above player using the egocentricOffset
+        targetEgocentricPosition = player.transform.position + player.transform.TransformDirection(egocentricOffset);
+
+        float pitch = egocentricPitch; // use inspector-tunable value
+        float yaw = player.transform.eulerAngles.y;
+        targetEgocentricRotation = Quaternion.Euler(pitch, yaw, 0f);
     }
+
     
     IEnumerator ShowRewardSequence()
     {
         int rewardCount = rewardManager.GetCurrentRewardCount();
         if (rewardCount == 0)
         {
-            Debug.LogError("ShowRewardSequence: no rewards to show (rewardCount == 0). Aborting sequence.");
+            Debug.LogError("ShowRewardSequence: no rewards to show. Aborting.");
             StartGamePhase();
             yield break;
         }
@@ -82,7 +77,6 @@ public class CameraManager : MonoBehaviour
             Debug.Log($"Showing sequence {repetition + 1}/{memorizationRepetitions}");
             for (int i = 0; i < rewardCount; i++)
             {
-                Debug.Log($"Showing reward index {i}");
                 rewardManager.ShowReward(i);
                 yield return new WaitForSeconds(rewardDisplayTime);
                 rewardManager.HideReward(i);
@@ -93,34 +87,60 @@ public class CameraManager : MonoBehaviour
                 yield return new WaitForSeconds(pauseBetweenSeq);
         }
 
-        Debug.Log("Memorization complete! Starting game...");
+        Debug.Log("Memorization complete! Transitioning to first-person view...");
         yield return new WaitForSeconds(1f);
+        StartCoroutine(TransitionToEgocentric());
+    }
+    
+    IEnumerator TransitionToEgocentric()
+    {
+        player.GetComponent<Renderer>().enabled = true;
+
+        CalculateEgocentricTarget();
+
+        Vector3 startPos = mainCamera.transform.position;
+        Quaternion startRot = mainCamera.transform.rotation;
+
+        float elapsed = 0f;
+
+        while (elapsed < transitionDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / transitionDuration);
+
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            mainCamera.transform.position = Vector3.Lerp(startPos, targetEgocentricPosition, smoothT);
+            mainCamera.transform.rotation = Quaternion.Slerp(startRot, targetEgocentricRotation, smoothT);
+
+            yield return null;
+        }
+
+        mainCamera.transform.position = targetEgocentricPosition;
+        mainCamera.transform.rotation = targetEgocentricRotation;
+
         StartGamePhase();
     }
     
     void StartGamePhase()
     {
-        SetupGameplayCameras();
-        
-        player.GetComponent<Renderer>().enabled = true;
+        // allow player movement
         player.GetComponent<moveplayer>().enabled = true;
-        
-        // Notify rewardManager that trial is starting
+
+        // Parent camera to player but KEEP world transform so the camera doesn't snap.
+        mainCamera.transform.SetParent(player.transform, true);
+
+        // Apply the inspector-tunable local offset and pitch so the camera sits behind & above the player.
+        // Make sure you have a public float egocentricPitch defined (degrees) and egocentricOffset set in Inspector.
+        mainCamera.transform.localPosition = egocentricOffset;
+        mainCamera.transform.localRotation = Quaternion.Euler(egocentricPitch, 0f, 0f);
+
         var rewardMgr = FindObjectOfType<rewardManager>();
         if (rewardMgr != null)
         {
             rewardMgr.StartNewTrial(player.transform.position);
         }
-        
-        Debug.Log("Find the rewards in order: A → B → C → D");
-    }
 
-    public void DisableMiniMap()
-    {
-        
-        if (miniMapCamera != null && miniMapCamera.enabled)
-        {
-            miniMapCamera.enabled = false;
-        }
+        Debug.Log("Find the rewards in order: A → B → C → D");
     }
 }

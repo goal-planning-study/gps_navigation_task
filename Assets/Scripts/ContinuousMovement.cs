@@ -66,11 +66,6 @@ public class ContinuousMovement : MonoBehaviour
             hasMoved = true;
             inputReceived = true;
         }
-        
-        if (inputReceived) //V: disable minimap camera at first input
-        {
-            cameraManager.DisableMiniMap();
-        }
     }
 
     bool WithinBounds(Vector3 position)
