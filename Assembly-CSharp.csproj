@@ -50,13 +50,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets/Scripts/ParticipantInfoReader.cs" />
+    <Compile Include="Assets/Scripts/Flow/SceneSequenceManager.cs" />
+    <Compile Include="Assets/Scripts/Flow/EndingScreenController.cs" />
     <Compile Include="Assets/Scripts/DataLogger.cs" />
+    <Compile Include="Assets/Scripts/Flow/InstructionPhaseController.cs" />
     <Compile Include="Assets/Scripts/reward manager.cs" />
     <Compile Include="Assets/Scripts/ContinuousMovement.cs" />
     <Compile Include="Assets/Scripts/move player.cs" />
     <Compile Include="Assets/4K Tiled Ground Textures p1/Scripts/AutoSpriteChanger_gp1.cs" />
     <Compile Include="Assets/Scripts/camera manager.cs" />
     <Compile Include="Assets/TutorialInfo/Scripts/Readme.cs" />
+    <Compile Include="Assets/Scripts/Flow/WelcomeScreenController.cs" />
+    <Compile Include="Assets/Scripts/FreeMovementScripts/RewardManager_FreeMovement.cs" />
+    <Compile Include="Assets/Scripts/FreeMovementScripts/FreeContinuousMovement.cs" />
+    <Compile Include="Assets/Scripts/FreeMovementScripts/CameraManager_FreeMovement.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets/Customizable Skybox/Stylized Sky/Shaders/Stylized Sky.shader" />
