@@ -1,6 +1,6 @@
+// InstructionPhaseController.cs
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine.InputSystem;
 
 public class InstructionPhaseController : MonoBehaviour
@@ -9,39 +9,34 @@ public class InstructionPhaseController : MonoBehaviour
     public CameraManager_FreeMovement cameraManager;
     public GameObject player;
 
-    [Header("InstructionPhase settings")]
+    [Header("Settings")]
     public int requiredStreak = 3;
-    public float displayDuration = 3.0f;      // how long the reward is visible from birds-eye
-    public float pauseAfterHide = 0.15f;      // short pause after hiding before drop
-    public float waitForPressTimeout = 30f;   // optional timeout for player response (seconds)
-    public float feedbackDuration = 2.0f;     // show feedback before returning to birds-eye
+    public float displayDuration = 3.0f;
+    public float pauseAfterHide = 0.15f;
+    public float waitForPressTimeout = 30f;
+    public float feedbackDuration = 2.0f;
     public float pauseBetweenTrials = 0.5f;
 
-    private bool waitingForSpace = false;
-    private bool firstTry = true;
     private Vector3 originalPlayerPosition;
+    private bool spaceHandled = false;
 
     void Start()
     {
+        Debug.Log("[Instruction] Starting InstructionPhase");
+
         if (rewardManager == null) rewardManager = Object.FindAnyObjectByType<RewardManager_FreeMovement>();
         if (cameraManager == null) cameraManager = Object.FindAnyObjectByType<CameraManager_FreeMovement>();
-        if (player == null)
-        {
-            var p = GameObject.FindWithTag("Player");
-            if (p != null) player = p;
-        }
+        if (player == null) player = GameObject.FindWithTag("Player");
 
-        // store player's original tile so we can reset each trial to identical start
         if (player != null) originalPlayerPosition = player.transform.position;
 
-        // ensure configuration loaded
         if (rewardManager != null) rewardManager.LoadConfiguration(0);
 
-        // ensure SceneSequenceManager exists
         if (SceneSequenceManager.Instance == null)
         {
             var go = new GameObject("SceneSequenceManager");
             go.AddComponent<SceneSequenceManager>();
+            Debug.Log("[Instruction] Created SceneSequenceManager");
         }
 
         StartCoroutine(RunInstructionLoop());
@@ -52,11 +47,12 @@ public class InstructionPhaseController : MonoBehaviour
         while (true)
         {
             int rewardCount = rewardManager != null ? rewardManager.GetCurrentRewardCount() : 0;
-            if (rewardCount == 0) { Debug.LogWarning("[Instruction] no rewards available"); yield break; }
+            if (rewardCount == 0) { Debug.LogWarning("[Instruction] No rewards available"); yield break; }
 
             int idx = Random.Range(0, rewardCount);
+            Debug.Log($"[Instruction] Trial start - target reward: {(char)('A' + idx)}");
 
-            // ensure camera at birds-eye and player hidden/locked
+            // Setup birds-eye view
             rewardManager.HideAllRewards();
             cameraManager.SetupAllocentricView();
 
@@ -64,86 +60,73 @@ public class InstructionPhaseController : MonoBehaviour
             {
                 var rend = player.GetComponent<Renderer>();
                 if (rend != null) rend.enabled = false;
-                var mover = player.GetComponentInChildren<FreeContinuousMovement>();
-                if (mover != null) mover.enabled = false;
-
-                // ensure player is reset to the same starting tile each trial
+                var moverComponent = player.GetComponentInChildren<FreeContinuousMovement>();
+                if (moverComponent != null) moverComponent.enabled = false;
                 player.transform.position = originalPlayerPosition;
+                player.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
             }
 
-            // show the selected reward from birds-eye for displayDuration seconds
+            // Show reward from birds-eye
             rewardManager.ShowReward(idx);
             yield return new WaitForSeconds(displayDuration);
 
-            // hide the shown reward and pause briefly
             rewardManager.HideReward(idx);
-
-            // inform reward manager which index we are targeting for this trial
             rewardManager.instructionTargetIdx = idx;
 
             yield return new WaitForSeconds(pauseAfterHide);
 
-            // drop to player (camera manager handles enabling movement at end of drop)
+            // Drop to egocentric view
             cameraManager.BeginDrop();
-
-            // wait for the drop to finish
             yield return new WaitForSeconds(cameraManager.transitionDuration + 0.1f);
 
-            // wait for a single space press (first-try matters). single attempt per trial.
-            waitingForSpace = true;
-            firstTry = true;
+            // Wait for single space press (FreeContinuousMovement stays enabled for movement)
+            // Use pressDetected flag to ensure we only count the FIRST press
+            bool pressDetected = false;
             bool trialSucceeded = false;
             float elapsed = 0f;
 
-            while (waitingForSpace)
+            while (!pressDetected)
             {
                 elapsed += Time.deltaTime;
 
                 var kb = Keyboard.current;
                 if (kb != null && kb.spaceKey.wasPressedThisFrame)
                 {
+                    pressDetected = true;
                     Vector3 pressPos = player != null ? player.transform.position : Vector3.zero;
-
-                    // single authoritative call to RecordSpacePress — it returns whether correct
+                    
+                    // Call RecordSpacePress only ONCE
                     bool correct = rewardManager.RecordSpacePress(pressPos);
-
-                    if (correct && firstTry) trialSucceeded = true;
-                    else trialSucceeded = false;
-
-                    waitingForSpace = false;
+                    
+                    Debug.Log($"[Instruction] Space pressed - correct={correct}");
+                    trialSucceeded = correct;
                     break;
                 }
 
-                // optional timeout to avoid infinite wait
                 if (elapsed >= waitForPressTimeout)
                 {
-                    Debug.Log("[Instruction] Wait-for-press timed out; treating as incorrect.");
-                    waitingForSpace = false;
+                    Debug.Log("[Instruction] Timeout - treating as incorrect");
+                    pressDetected = true;
                     trialSucceeded = false;
                     break;
                 }
 
-                // after the first frame without pressing, subsequent presses are no longer first-try
-                firstTry = false;
                 yield return null;
             }
 
-            // show feedback for a short duration (reward remains shown if correct; otherwise you can display an icon)
+            // Show feedback
             if (trialSucceeded)
             {
-                Debug.Log("[Instruction] Correct first-try — showing positive feedback.");
-                // keep the revealed reward visible (RecordSpacePress already called ShowReward)
+                Debug.Log("[Instruction] CORRECT - showing positive feedback");
             }
             else
             {
-                Debug.Log("[Instruction] Incorrect — showing negative feedback (you can replace with icon).");
-                // optionally show an incorrect icon here (not implemented)
+                Debug.Log("[Instruction] INCORRECT - showing negative feedback");
             }
 
-            // wait feedbackDuration so participant sees the result
             yield return new WaitForSeconds(feedbackDuration);
 
-            // update streak safely
+            // Update streak
             var mgr = SceneSequenceManager.Instance;
             if (trialSucceeded)
             {
@@ -154,36 +137,21 @@ public class InstructionPhaseController : MonoBehaviour
                 if (mgr != null) mgr.ResetInstructionStreak();
             }
 
-            // check end condition
+            // Check completion
             if (mgr != null && mgr.instructionCorrectStreak >= requiredStreak)
             {
-                // tidy up: hide any revealed reward, small pause, then go to main scene
+                Debug.Log($"[Instruction] Required streak reached ({requiredStreak}) - transitioning to main scene");
                 rewardManager.HideAllRewards();
                 cameraManager.SetupAllocentricView();
                 yield return new WaitForSeconds(0.8f);
-                mgr.GoToMainScene();
+                mgr.GoToFreeMovementScene();
                 yield break;
             }
 
-            // prepare for next trial: hide any revealed reward and move camera back to birds-eye
+            // Reset for next trial
             rewardManager.HideAllRewards();
             cameraManager.SetupAllocentricView();
-
-            // small pause before next trial
             yield return new WaitForSeconds(pauseBetweenTrials);
         }
     }
-
-    int GetLastShown()
-    {
-        if (rewardManager == null) return -1;
-        var t = rewardManager.GetType();
-        var fi = t.GetField("lastShownRewardIdx", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        if (fi != null)
-        {
-            return (int)fi.GetValue(rewardManager);
-        }
-        return -1;
-    }
 }
-

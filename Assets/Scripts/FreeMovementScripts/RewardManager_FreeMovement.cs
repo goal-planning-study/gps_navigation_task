@@ -7,9 +7,9 @@ public class RewardManager_FreeMovement : MonoBehaviour
     [System.Serializable]
     public class GridPosition
     {
-        public float x;  // Unity X (left/right)
-        public float y;  // Unity Y (height)
-        public float z;  // Unity Z (forward/back)
+        public float x;
+        public float y;
+        public float z;
         public Vector3 ToVector3() => new Vector3(x, y, z);
     }
 
@@ -17,7 +17,7 @@ public class RewardManager_FreeMovement : MonoBehaviour
     public class RewardConfiguration
     {
         public string configName;
-        public string trialType; // "forw" or "backw"
+        public string trialType;
         public List<GridPosition> rewardPositions;
     }
 
@@ -37,12 +37,8 @@ public class RewardManager_FreeMovement : MonoBehaviour
     [Header("Data Logger")]
     public DataLogger dataLogger;
 
-    [Header("Memorization / Free-Move Settings")]
-    public int memorizationRepetitions = 2;
-    public float rewardDisplayTime = 1.5f;
-    public float pauseBetweenRewards = 0.5f;
-    public float pauseBeforeDrop = 0.8f;
-    public float uncoverThreshold = 0.5f; // world units tolerance for RecordSpacePress
+    [Header("Settings")]
+    public float cellTolerance = 0.45f; // fraction of cell size (0.5 = full cell)
 
     public bool autoStartConfiguration = true;
     public int instructionTargetIdx = -1;
@@ -54,7 +50,6 @@ public class RewardManager_FreeMovement : MonoBehaviour
     private int repsCompleted = 0;
     private int lastShownRewardIdx = -1;
 
-    // logging
     private int keyPressIndex = 0;
     private int movementIndex = 0;
     private Vector3 playerStartPosition;
@@ -68,7 +63,6 @@ public class RewardManager_FreeMovement : MonoBehaviour
     void Awake()
     {
         LoadConfigurationsFromFile();
-
         if (configData != null && configData.configurations.Count > 0)
         {
             LoadConfiguration(0);
@@ -87,15 +81,12 @@ public class RewardManager_FreeMovement : MonoBehaviour
             Debug.Log($"[Free] Starting {configData.configurations[currentConfigIdx].configName}");
         }
 
-        // auto-bind datalogger if not set
         if (dataLogger == null)
         {
             dataLogger = Object.FindAnyObjectByType<DataLogger>();
-            if (dataLogger != null) Debug.Log("[Free] Bound DataLogger via FindAnyObjectByType");
+            if (dataLogger != null) Debug.Log("[Free] Bound DataLogger");
         }
 
-        // Only auto-start the first configuration if the inspector flag allows it.
-        // InstructionPhase will set this flag to false in the Inspector to take manual control.
         if (autoStartConfiguration)
         {
             StartNextConfiguration_Free();
@@ -113,11 +104,11 @@ public class RewardManager_FreeMovement : MonoBehaviour
         try
         {
             configData = JsonUtility.FromJson<ConfigurationData>(configurationFile.text);
-            Debug.Log($"[Free] Loaded {configData.configurations.Count} configurations from file");
+            Debug.Log($"[Free] Loaded {configData.configurations.Count} configurations");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[Free] Failed to load configuration file: {e.Message}");
+            Debug.LogError($"[Free] Failed to load config: {e.Message}");
         }
     }
 
@@ -152,13 +143,20 @@ public class RewardManager_FreeMovement : MonoBehaviour
             currentRewardObjects[i].name = $"Reward_{(char)('A' + i)}_{configData.configurations[index].configName}";
             var rend = currentRewardObjects[i].GetComponent<Renderer>();
             if (rend != null) rend.enabled = false;
-            Debug.Log($"[Free] Reward {(char)('A' + i)} at world position: {worldPos}");
         }
 
         nextRewardIdx = 0;
         lastShownRewardIdx = -1;
         HideAllRewards();
         trialCompleted = false;
+        
+        // Reset player to starting position and north-facing rotation
+        var playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+        {
+            playerObj.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
+        }
+        
         Debug.Log($"[Free] Loaded {configData.configurations[index].configName} with {positions.Count} rewards");
     }
 
@@ -180,7 +178,7 @@ public class RewardManager_FreeMovement : MonoBehaviour
             }
         }
 
-        Debug.Log($"[Free] Trial started cfg={currentConfigIdx} rep={repsCompleted} startPos={playerStartPosition}");
+        Debug.Log($"[Free] Trial started cfg={currentConfigIdx} rep={repsCompleted}");
     }
 
     private string GetCurrentSequence()
@@ -189,100 +187,108 @@ public class RewardManager_FreeMovement : MonoBehaviour
         return config.trialType == "backw" ? "D-C-B-A" : "A-B-C-D";
     }
 
-    // made public so CameraManager_FreeMovement can read it
     public string GetCurrentTrialType() => configData.configurations[currentConfigIdx].trialType;
-
     public int GetCurrentRewardCount() => currentRewardObjects != null ? currentRewardObjects.Length : 0;
     public string GetCurrentConfigName() => configData.configurations[currentConfigIdx].configName;
 
-    public bool RecordSpacePress(Vector3 worldPos)
+    // Calculate grid cell size from reward positions
+    private (float cellWidth, float cellDepth) GetCellDimensions()
     {
-        // debounce duplicate calls (same real press may be routed twice)
-        if (Time.time - lastSpaceTime < spaceDebounce)
-        {
-            Debug.Log("[Free] RecordSpacePress ignored due to debounce.");
-            return false;
-        }
-        lastSpaceTime = Time.time;
+        if (currentRewardObjects == null || currentRewardObjects.Length < 2)
+            return (10.3f, 10.3f); // default
 
-        Debug.Log($"[Free] Space press at ({worldPos.x:F3},{worldPos.y:F3},{worldPos.z:F3}) cfg={currentConfigIdx} rep={repsCompleted}");
-
-        // Log raw press coordinates if DataLogger supports it
-        if (dataLogger != null)
-        {
-            var mi = dataLogger.GetType().GetMethod("LogSpacePress");
-            if (mi != null)
-            {
-                try { mi.Invoke(dataLogger, new object[] { currentConfigIdx, repsCompleted, worldPos }); }
-                catch { Debug.LogWarning("[Free] DataLogger.LogSpacePress invocation failed."); }
-            }
-        }
-
-        if (experimentFinished || trialCompleted || currentRewardObjects == null) return false;
-
-        // choose the intended target: instructionTargetIdx (if set) otherwise the sequence nextRewardIdx
-        int targetIdx = (instructionTargetIdx >= 0) ? instructionTargetIdx : nextRewardIdx;
-
-        if (targetIdx < 0 || targetIdx >= currentRewardObjects.Length)
-        {
-            Debug.LogWarning("[Free] RecordSpacePress: invalid target index.");
-            // clear instruction target in case it was invalid to avoid stuck state
-            if (instructionTargetIdx >= 0) instructionTargetIdx = -1;
-            return false;
-        }
-
-        Vector3 rewardCenter = currentRewardObjects[targetIdx].transform.position;
-
-        // compute cell half-sizes robustly (same code as before)
         List<float> xs = new List<float>();
         List<float> zs = new List<float>();
+        
         foreach (var go in currentRewardObjects)
         {
             if (go == null) continue;
             xs.Add(go.transform.position.x);
             zs.Add(go.transform.position.z);
         }
-        xs.Sort(); zs.Sort();
+        
+        xs.Sort();
+        zs.Sort();
 
-        float defaultSpacing = 10.3f;
         float minDx = float.MaxValue;
         for (int i = 1; i < xs.Count; i++)
         {
             float d = Mathf.Abs(xs[i] - xs[i - 1]);
-            if (d > 0f && d < minDx) minDx = d;
+            if (d > 0.01f && d < minDx) minDx = d;
         }
+
         float minDz = float.MaxValue;
         for (int i = 1; i < zs.Count; i++)
         {
             float d = Mathf.Abs(zs[i] - zs[i - 1]);
-            if (d > 0f && d < minDz) minDz = d;
+            if (d > 0.01f && d < minDz) minDz = d;
         }
 
-        float cellWidth = (minDx == float.MaxValue) ? defaultSpacing : minDx;
-        float cellDepth = (minDz == float.MaxValue) ? defaultSpacing : minDz;
-        float halfSizeX = Mathf.Max(cellWidth * 0.5f - 0.001f, 0.01f);
-        float halfSizeZ = Mathf.Max(cellDepth * 0.5f - 0.001f, 0.01f);
+        float cellWidth = (minDx == float.MaxValue) ? 10.3f : minDx;
+        float cellDepth = (minDz == float.MaxValue) ? 10.3f : minDz;
 
-        bool insideX = worldPos.x >= (rewardCenter.x - halfSizeX) && worldPos.x <= (rewardCenter.x + halfSizeX);
-        bool insideZ = worldPos.z >= (rewardCenter.z - halfSizeZ) && worldPos.z <= (rewardCenter.z + halfSizeZ);
+        return (cellWidth, cellDepth);
+    }
 
-        if (insideX && insideZ)
+    public bool RecordSpacePress(Vector3 worldPos)
+    {
+        if (Time.time - lastSpaceTime < spaceDebounce)
         {
-            Debug.Log($"[Free] Correct uncover for reward {(char)('A' + targetIdx)} (center={rewardCenter}, press={worldPos})");
+            return false;
+        }
+        lastSpaceTime = Time.time;
 
-            // show the revealed reward
+        Debug.Log($"[Free] Space press at ({worldPos.x:F3},{worldPos.z:F3}) cfg={currentConfigIdx} rep={repsCompleted}");
+
+        if (dataLogger != null)
+        {
+            var mi = dataLogger.GetType().GetMethod("LogSpacePress");
+            if (mi != null)
+            {
+                try { mi.Invoke(dataLogger, new object[] { currentConfigIdx, repsCompleted, worldPos }); }
+                catch { }
+            }
+        }
+
+        if (experimentFinished || trialCompleted || currentRewardObjects == null) return false;
+
+        int targetIdx = (instructionTargetIdx >= 0) ? instructionTargetIdx : nextRewardIdx;
+
+        if (targetIdx < 0 || targetIdx >= currentRewardObjects.Length)
+        {
+            if (instructionTargetIdx >= 0) instructionTargetIdx = -1;
+            return false;
+        }
+
+        Vector3 rewardCenter = currentRewardObjects[targetIdx].transform.position;
+        var (cellWidth, cellDepth) = GetCellDimensions();
+
+        // Use tolerance as fraction of cell size
+        float halfSizeX = cellWidth * cellTolerance;
+        float halfSizeZ = cellDepth * cellTolerance;
+
+        float dx = Mathf.Abs(worldPos.x - rewardCenter.x);
+        float dz = Mathf.Abs(worldPos.z - rewardCenter.z);
+
+        bool insideCell = (dx <= halfSizeX) && (dz <= halfSizeZ);
+
+        Debug.Log($"[Free] Target={targetIdx}, RewardCenter=({rewardCenter.x:F2},{rewardCenter.z:F2}), dx={dx:F2}, dz={dz:F2}, halfX={halfSizeX:F2}, halfZ={halfSizeZ:F2}, inside={insideCell}");
+
+        if (insideCell)
+        {
+            Debug.Log($"[Free] CORRECT uncover for reward {(char)('A' + targetIdx)}");
+
             ShowReward(targetIdx);
             lastShownRewardIdx = targetIdx;
 
-            // If this was an instruction check, clear the instructionTargetIdx but do NOT advance the sequence
             if (instructionTargetIdx >= 0)
             {
+                // Instruction trial - don't advance sequence
                 instructionTargetIdx = -1;
-                // don't advance nextRewardIdx — instruction trials are separate from normal sequence
             }
             else
             {
-                // Normal sequence gameplay: advance and log reward
+                // Normal gameplay - advance sequence
                 nextRewardIdx++;
                 movementIndex++;
 
@@ -304,7 +310,7 @@ public class RewardManager_FreeMovement : MonoBehaviour
                                 movementIndex
                             });
                         }
-                        catch { /* ignore */ }
+                        catch { }
                     }
                 }
 
@@ -320,78 +326,44 @@ public class RewardManager_FreeMovement : MonoBehaviour
         }
         else
         {
-            float dx = Mathf.Abs(worldPos.x - rewardCenter.x);
-            float dz = Mathf.Abs(worldPos.z - rewardCenter.z);
-            float dist = Mathf.Sqrt(dx * dx + dz * dz);
-            Debug.Log($"[Free] Incorrect uncover (dist={dist:F3}) - player pressed at {worldPos}, expected square centered at {rewardCenter}");
+            Debug.Log($"[Free] INCORRECT - outside cell (dx={dx:F2} > {halfSizeX:F2} OR dz={dz:F2} > {halfSizeZ:F2})");
 
             if (dataLogger != null)
             {
+                float dist = Mathf.Sqrt(dx * dx + dz * dz);
                 var mi = dataLogger.GetType().GetMethod("LogSpaceMiss");
                 if (mi != null)
                 {
                     try { mi.Invoke(dataLogger, new object[] { currentConfigIdx, repsCompleted, worldPos, dist }); }
-                    catch { /* ignore */ }
+                    catch { }
                 }
             }
 
-            // if instruction trial, clear instruction target so controller can proceed
             if (instructionTargetIdx >= 0) instructionTargetIdx = -1;
-
             return false;
         }
     }
-
 
     public void CheckHideRewardOnMove(Vector3 playerPos)
     {
         if (lastShownRewardIdx < 0 || currentRewardObjects == null) return;
         if (lastShownRewardIdx >= currentRewardObjects.Length) { lastShownRewardIdx = -1; return; }
 
-        // compute cell half-sizes the same way as in RecordSpacePress
-        List<float> xs = new List<float>();
-        List<float> zs = new List<float>();
-        foreach (var go in currentRewardObjects)
-        {
-            if (go == null) continue;
-            xs.Add(go.transform.position.x);
-            zs.Add(go.transform.position.z);
-        }
-        xs.Sort();
-        zs.Sort();
-
-        float defaultSpacing = 10.3f;
-        float minDx = float.MaxValue;
-        for (int i = 1; i < xs.Count; i++)
-        {
-            float d = Mathf.Abs(xs[i] - xs[i - 1]);
-            if (d > 0f && d < minDx) minDx = d;
-        }
-        float minDz = float.MaxValue;
-        for (int i = 1; i < zs.Count; i++)
-        {
-            float d = Mathf.Abs(zs[i] - zs[i - 1]);
-            if (d > 0f && d < minDz) minDz = d;
-        }
-
-        float cellWidth = (minDx == float.MaxValue) ? defaultSpacing : minDx;
-        float cellDepth = (minDz == float.MaxValue) ? defaultSpacing : minDz;
-        float halfSizeX = cellWidth * 0.5f;
-        float halfSizeZ = cellDepth * 0.5f;
-
-        float eps = 0.001f;
-        halfSizeX = Mathf.Max(halfSizeX - eps, 0.01f);
-        halfSizeZ = Mathf.Max(halfSizeZ - eps, 0.01f);
-
         Vector3 rewardCenter = currentRewardObjects[lastShownRewardIdx].transform.position;
-        bool insideX = playerPos.x >= (rewardCenter.x - halfSizeX) && playerPos.x <= (rewardCenter.x + halfSizeX);
-        bool insideZ = playerPos.z >= (rewardCenter.z - halfSizeZ) && playerPos.z <= (rewardCenter.z + halfSizeZ);
+        var (cellWidth, cellDepth) = GetCellDimensions();
 
-        if (!(insideX && insideZ))
+        float halfSizeX = cellWidth * cellTolerance;
+        float halfSizeZ = cellDepth * cellTolerance;
+
+        float dx = Mathf.Abs(playerPos.x - rewardCenter.x);
+        float dz = Mathf.Abs(playerPos.z - rewardCenter.z);
+
+        bool insideCell = (dx <= halfSizeX) && (dz <= halfSizeZ);
+
+        if (!insideCell)
         {
-            // player left the square — hide the revealed reward
             HideReward(lastShownRewardIdx);
-            Debug.Log($"[Free] Player left square for reward {(char)('A' + lastShownRewardIdx)}; hiding reward.");
+            Debug.Log($"[Free] Player left square for reward {(char)('A' + lastShownRewardIdx)}");
             lastShownRewardIdx = -1;
         }
     }
@@ -457,12 +429,5 @@ public class RewardManager_FreeMovement : MonoBehaviour
         foreach (var r in currentRewardObjects)
             if (r != null)
                 r.GetComponent<Renderer>().enabled = false;
-    }
-
-    // Compatibility shim (optional)
-    public bool RewardFound(Vector3 playerPosition, string keyPressed)
-    {
-        RecordSpacePress(playerPosition);
-        return true;
     }
 }

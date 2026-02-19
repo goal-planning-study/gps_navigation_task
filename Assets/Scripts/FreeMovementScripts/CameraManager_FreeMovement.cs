@@ -41,6 +41,7 @@ public class CameraManager_FreeMovement : MonoBehaviour
         {
             var rend = player.GetComponent<Renderer>(); if (rend!=null) rend.enabled = false;
             var mover = player.GetComponentInChildren<FreeContinuousMovement>(); if (mover!=null) mover.enabled = false;
+            player.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
         }
 
         SetupAllocentricView();

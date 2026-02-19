@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/FreeMovement.unity
     guid: c1491cb5aec6b4ee69d56a9f410ed3f8
+  - enabled: 1
+    path: Assets/Scenes/InstructionPhase.unity
+    guid: 1a1ba36b704b240ed8a4c74c353b8550
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

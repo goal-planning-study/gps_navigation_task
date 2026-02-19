@@ -73,11 +73,20 @@ public class FreeContinuousMovement : MonoBehaviour
             transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
 
         // ===== SPACE PRESS =====
+        // ONLY handle space press if NOT in instruction mode (instructionTargetIdx == -1)
         if (keyboard.spaceKey.wasPressedThisFrame)
         {
             Vector3 pos = transform.position;
             if (rewardManager != null)
-                rewardManager.RecordSpacePress(pos);
+            {
+                // Check if we're in instruction mode
+                if (rewardManager.instructionTargetIdx == -1)
+                {
+                    // Normal gameplay mode - handle space press
+                    rewardManager.RecordSpacePress(pos);
+                }
+                // If instructionTargetIdx >= 0, InstructionPhaseController handles it
+            }
         }
     }
 }

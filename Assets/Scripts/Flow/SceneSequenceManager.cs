@@ -1,54 +1,81 @@
-// Assets/Scripts/Flow/SceneSequenceManager.cs
+// SceneSequenceManager.cs
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
+
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 public class SceneSequenceManager : MonoBehaviour
 {
     public static SceneSequenceManager Instance { get; private set; }
 
-    [Header("Scene Order")]
-    public string welcomeScene = "WelcomeScreen";
+    [Header("Scene Names")]
     public string instructionScene = "InstructionPhase";
     public string mainScene = "My Scene";
     public string freeMovementScene = "FreeMovement";
     public string endingScene = "EndingScreen";
 
-    [Header("Player state")]
+    [Header("Player State")]
     public int points = 0;
-
-    // internal
     public int instructionCorrectStreak = 0;
 
     void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        Debug.Log("[SceneSequence] Manager initialized");
     }
 
-    void Start()
+    public void GoToInstructionPhase()
     {
-        // If already in another scene, ensure first scene is WelcomeScreen
-        if (SceneManager.GetActiveScene().name != welcomeScene)
-        {
-            StartCoroutine(LoadSceneAsync(welcomeScene));
-        }
+        Debug.Log("[SceneSequence] Loading InstructionPhase");
+        LoadScene(instructionScene);
     }
 
-    public IEnumerator LoadSceneAsync(string sceneName)
+    public void GoToMainScene()
     {
-        var op = SceneManager.LoadSceneAsync(sceneName);
-        while (!op.isDone) yield return null;
+        Debug.Log("[SceneSequence] Loading MainScene");
+        LoadScene(mainScene);
     }
 
-    public void GoToInstructionPhase() => StartCoroutine(LoadSceneAsync(instructionScene));
-    public void GoToMainScene() => StartCoroutine(LoadSceneAsync(mainScene));
-    public void GoToFreeMovementScene() => StartCoroutine(LoadSceneAsync(freeMovementScene));
-    public void GoToEndingScene() => StartCoroutine(LoadSceneAsync(endingScene));
+    public void GoToFreeMovementScene()
+    {
+        Debug.Log("[SceneSequence] Loading FreeMovementScene");
+        LoadScene(freeMovementScene);
+    }
 
-    // scoring helpers
+    public void GoToEndingScene()
+    {
+        Debug.Log("[SceneSequence] Loading EndingScene");
+        LoadScene(endingScene);
+    }
+
+    private void LoadScene(string sceneName)
+    {
+#if UNITY_EDITOR
+        // In Editor: use EditorSceneManager (works without Build Settings)
+        EditorSceneManager.LoadSceneInPlayMode(
+            $"Assets/Scenes/{sceneName}.unity",
+            new LoadSceneParameters(LoadSceneMode.Single)
+        );
+#else
+        // In Build: use standard SceneManager (requires Build Settings)
+        SceneManager.LoadScene(sceneName);
+#endif
+    }
+
     public void AddPoints(int v) { points += v; }
     public void ResetInstructionStreak() { instructionCorrectStreak = 0; }
-    public void IncrementInstructionStreak() { instructionCorrectStreak++; }
+    public void IncrementInstructionStreak()
+    {
+        instructionCorrectStreak++;
+        Debug.Log($"[SceneSequence] Instruction streak: {instructionCorrectStreak}");
+    }
 }
